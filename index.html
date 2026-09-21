@@ -89,7 +89,7 @@
     .tab-btn { flex: 1; padding: 10px 4px; background: none; border: none; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center; border-bottom: 2px solid transparent; transition: all 0.25s ease; }
     .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(56, 189, 248, 0.08); }
 
-    /* Поиск в чате */
+    /* Поиск в чате (Админ) */
     .chat-search-bar { background: var(--header-bg); padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
     /* Сообщения */
@@ -399,9 +399,9 @@
         <button class="tab-btn ${activeTab === 'top' ? 'active' : ''}" onclick="switchTab('top')">🏆 Топ</button>
       </div>
 
-      ${(activeTab !== 'members' && activeTab !== 'top') ? `
+      ${(isAdmin && activeTab !== 'members' && activeTab !== 'top') ? `
         <div class="chat-search-bar">
-          <input type="text" class="search-input" id="chatSearch" placeholder="🔍 Поиск по сообщениям и авторам..." value="${escapeHtml(chatSearchQuery)}" oninput="onSearchInput(this.value)">
+          <input type="text" class="search-input" id="chatSearch" placeholder="🔍 (Админ) Поиск по сообщениям..." value="${escapeHtml(chatSearchQuery)}" oninput="onSearchInput(this.value)">
         </div>
       ` : ''}
 
@@ -1014,8 +1014,8 @@
 
       chatBody.innerHTML = '';
 
-      // Фильтрация поиска
-      if (chatSearchQuery.trim() !== '') {
+      // Фильтрация поиска (Только если Админ)
+      if (isAdmin && chatSearchQuery.trim() !== '') {
         const query = chatSearchQuery.toLowerCase();
         keys = keys.filter(id => {
           const m = data[id];
@@ -1088,7 +1088,6 @@
             <span class="msg-sender" onclick="${!isAnonTab || isAdmin ? `openProfile('${safeSender}')` : ''}">${displayName} ${adminRealNameInfo}</span>
             <div>
               <button class="btn-action-msg" onclick="toggleEmojiPicker('${msgId}', event)" title="Добавить реакцию">😃</button>
-              <button class="btn-action-msg" onclick="setReply('${msgId}', '${safeSender}', '${safeText}')" title="Ответить">↩️</button>
               ${(isAdmin || isMy) ? `<button class="btn-action-msg" style="color:#ef4444;" onclick="deleteMsg('${path}', '${msgId}', '${safeSender}', '${safeText}')">🗑️</button>` : ''}
             </div>
           </div>
