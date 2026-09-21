@@ -234,15 +234,15 @@
   let presenceObj = {};
   let biosObj = {};
   let typingObj = {};
-  let dmUnreadMap = {}; // Карта непрочитанных ЛС: имя_собеседника -> true
+  let dmUnreadMap = {}; 
   let showLogsModal = false;
   let showAuditLogsModal = false;
   let deletedLogs = [];
   let auditLogs = [];
   let prevMsgCount = -1;
 
-  let replyTarget = null; // { sender, text, id }
-  let activeEmojiPicker = null; // msgId
+  let replyTarget = null; 
+  let activeEmojiPicker = null; 
   let chatSearchQuery = '';
 
   let selectedProfileUser = null;
@@ -329,7 +329,6 @@
     database.ref('bios').on('value', snap => { biosObj = snap.val() || {}; renderApp(); });
     database.ref('typing').on('value', snap => { typingObj = snap.val() || {}; updateTypingUI(); });
 
-    // Слушатель непрочитанных в ЛС
     if (currentUser) {
       database.ref('chats/dm').on('value', snap => {
         const allDms = snap.val() || {};
@@ -343,7 +342,6 @@
           const msgs = Object.values(thread);
           if (msgs.length > 0) {
             const lastMsg = msgs[msgs.length - 1];
-            // Если последнее сообщение не от меня и мы сейчас не в диалоге с ним (или даже всегда пометка)
             if (lastMsg.sender !== currentUser && activeTab !== 'dm' && dmTarget !== name) {
               const lastReadTime = localStorage.getItem('dm_read_' + dmKey) || 0;
               if ((lastMsg.timestamp || 0) > Number(lastReadTime)) {
@@ -531,7 +529,7 @@
     database.ref('passwords/' + safeKey).once('value').then(snap => {
       if (snap.exists()) {
         const pass = snap.val();
-        const entered = prompt(`Введите пароль аккаунта "${name}":`);
+        const entered = prompt(`Введите код/пароль аккаунта "${name}":`);
         if (entered === pass) {
           currentUser = name;
           localStorage.setItem('chat_user', name);
@@ -540,11 +538,11 @@
           logAuditEvent(`Успешный вход в аккаунт: ${name}`);
           renderApp();
         } else if (entered !== null) {
-          alert("Неверный пароль!");
+          alert("Неверный код/пароль!");
           logAuditEvent(`Неверный пароль для аккаунта: ${name}`);
         }
       } else {
-        alert(`Пароль для аккаунта "${name}" ещё не установлен. Попросите админа задать вам пароль.`);
+        alert(`Пароль/код для аккаунта "${name}" ещё не установлен. Попросите админа задать код.`);
       }
     });
   }
@@ -564,7 +562,6 @@
     listenChatMessages();
   }
 
-  /* ИНДИКАТОР ПЕЧАТАЕТ... */
   function handleTyping() {
     if (!database || !currentUser) return;
     const pathKey = getSafeKey(getChatRefPath());
@@ -699,7 +696,7 @@
 
     renderApp();
 
-    if (isAdmin && database) {
+    if (database) {
       loadAdminProfileData(userName);
     }
   }
@@ -721,8 +718,23 @@
     });
   }
 
+  function userChangeMyPassword() {
+    if (!currentUser) return;
+    const safeKey = getSafeKey(currentUser);
+    const newPass = prompt("Введите новый код/пароль для своего аккаунта:");
+    if (newPass && newPass.trim() !== '') {
+      database.ref('passwords/' + safeKey).set(newPass.trim()).then(() => {
+        alert("Ваш код/пароль успешно изменен!");
+        logAuditEvent(`Пользователь ${currentUser} сменил свой пароль`);
+        openProfile(currentUser);
+      });
+    } else if (newPass !== null) {
+      alert("Пароль не может быть пустым!");
+    }
+  }
+
   function loadAdminProfileData(targetName) {
-    if (!database || !isAdmin) return;
+    if (!database) return;
     const targetSafeKey = getSafeKey(targetName);
 
     const dossier = {
@@ -807,7 +819,7 @@
       <div class="modal-overlay" onclick="closeProfile()">
         <div class="modal-content" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <span>👤 Профиль</span>
+            <span>👤 Профиль (${targetName})</span>
             <button class="btn-close-dm" onclick="closeProfile()">✖</button>
           </div>
           <div class="modal-body">
@@ -827,20 +839,26 @@
               </div>
             </div>
 
-            ${!isAdmin ? `
+            <!-- Блок для обычного пользователя в своем аккаунте -->
+            ${canEditBio && !isAdmin ? `
               <div class="bio-section">
                 <span class="bio-title">📝 О себе / Описание:</span>
-                ${canEditBio ? `
-                  <textarea class="bio-box" id="bioInput" placeholder="Расскажите о себе...">${escapeHtml(bioText)}</textarea>
+                <textarea class="bio-box" id="bioInput" placeholder="Расскажите о себе...">${escapeHtml(bioText)}</textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <button class="btn-pass" onclick="userChangeMyPassword()">🔑 Сменить свой пароль/код</button>
                   <button class="btn-save-bio" onclick="saveBio('${safeTargetName}')">Сохранить описание</button>
-                ` : `
-                  <div class="bio-box" style="background: var(--card-bg); height: auto; min-height: 50px;">
-                    ${bioText ? escapeHtml(bioText) : '<i style="color:var(--text-muted);">Пользователь ничего не написал о себе.</i>'}
-                  </div>
-                `}
+                </div>
+              </div>
+            ` : !isAdmin ? `
+              <div class="bio-section">
+                <span class="bio-title">📝 О себе / Описание:</span>
+                <div class="bio-box" style="background: var(--card-bg); height: auto; min-height: 50px;">
+                  ${bioText ? escapeHtml(bioText) : '<i style="color:var(--text-muted);">Пользователь ничего не написал о себе.</i>'}
+                </div>
               </div>
             ` : ''}
 
+            <!-- Досье Администратора (админ всегда видит пароль и управляет им) -->
             ${isAdmin ? `
               <div class="admin-dossier">
                 <div class="admin-dossier-title">
@@ -856,10 +874,10 @@
                 </div>
 
                 <div class="dossier-block">
-                  <span class="dossier-label">🔑 Пароль аккаунта:</span>
+                  <span class="dossier-label">🔑 Пароль / код аккаунта (Всегда виден админу):</span>
                   <div style="display:flex; justify-content: space-between; align-items: center; gap: 8px;">
                     <b style="font-size: 1rem; color:#eab308;">${profileAdminData ? profileAdminData.password : 'Загрузка...'}</b>
-                    <button class="btn-pass" style="margin-left:auto;" onclick="setMemberPassword('${safeTargetName}')">Изменить</button>
+                    <button class="btn-pass" style="margin-left:auto;" onclick="setMemberPassword('${safeTargetName}')">Задать/Изменить</button>
                     <button class="btn-mute" onclick="toggleMute('${safeTargetName}')">${isMuted ? 'Размут' : 'Мут'}</button>
                   </div>
                 </div>
@@ -957,7 +975,6 @@
     endProfileViewTracking();
     dmTarget = target;
     activeTab = 'dm';
-    // Помечаем как прочитанное
     if (currentUser && database) {
       const dmKey = getDmKey(currentUser, target);
       localStorage.setItem('dm_read_' + dmKey, Date.now());
@@ -994,10 +1011,10 @@
   function setMemberPassword(targetName) {
     if (!database || !isAdmin) return;
     const safeKey = getSafeKey(targetName);
-    const newPass = prompt(`Введите новый пароль для аккаунта "${targetName}":`);
+    const newPass = prompt(`Введите новый пароль/код для аккаунта "${targetName}":`);
     if (newPass && newPass.trim() !== '') {
       database.ref('passwords/' + safeKey).set(newPass.trim()).then(() => {
-        alert(`Пароль для "${targetName}" успешно установлен!`);
+        alert(`Пароль/код для "${targetName}" успешно установлен!`);
         logAuditEvent(`Изменил пароль для ${targetName}`);
         if (selectedProfileUser === targetName) {
           loadAdminProfileData(targetName);
@@ -1026,7 +1043,6 @@
     renderApp();
   }
 
-  /* РЕАКЦИИ НА СООБЩЕНИЯ */
   function toggleEmojiPicker(msgId, event) {
     if (event) event.stopPropagation();
     activeEmojiPicker = activeEmojiPicker === msgId ? null : msgId;
@@ -1067,7 +1083,6 @@
 
       chatBody.innerHTML = '';
 
-      // Фильтрация поиска (Только если Админ)
       if (isAdmin && chatSearchQuery.trim() !== '') {
         const query = chatSearchQuery.toLowerCase();
         keys = keys.filter(id => {
@@ -1091,7 +1106,6 @@
         const safeText = (msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const safeSender = (msg.sender || '').replace(/'/g, "\\'");
 
-        // Отрисовка цитаты (Reply)
         let replyHtml = '';
         if (msg.replyTo) {
           replyHtml = `
@@ -1102,7 +1116,6 @@
           `;
         }
 
-        // Отрисовка реакций
         let reactionsHtml = '';
         if (msg.reactions) {
           const mySafeKey = getSafeKey(currentUser);
@@ -1125,7 +1138,6 @@
           }
         }
 
-        // Меню выбора эмодзи
         let emojiPickerHtml = '';
         if (activeEmojiPicker === msgId) {
           const emojiBtns = ALLOWED_REACTIONS.map(emoji => {
@@ -1150,7 +1162,6 @@
           <div class="msg-time">${msg.time || ''}</div>
         `;
 
-        // Реализация свайпа вправо для ответа
         attachSwipeToReply(msgEl, msgId, safeSender, safeText);
 
         chatBody.appendChild(msgEl);
@@ -1159,7 +1170,6 @@
     });
   }
 
-  /* СВАЙП ДЛЯ ОТВЕТА (REPLY) */
   function attachSwipeToReply(el, msgId, sender, text) {
     let startX = 0;
     let currentX = 0;
@@ -1223,7 +1233,6 @@
 
     database.ref(path).push(msgPayload);
 
-    // Удаляем статус "печатает"
     const pathKey = getSafeKey(path);
     database.ref(`typing/${pathKey}/${userSafeKey}`).remove();
 
@@ -1288,7 +1297,6 @@
     `;
   }
 
-  /* ЖУРНАЛ СОБЫТИЙ (AUDIT LOGS) */
   function openAuditLogsModal() {
     if (!database || !isAdmin) return;
     database.ref('audit_logs').limitToLast(50).once('value').then(snap => {
@@ -1312,7 +1320,7 @@
             <span>📜 Журнал событий (Audit Logs)</span>
             <button class="btn-close-dm" onclick="closeAuditLogsModal()">✖</button>
           </div>
-          <div class="modal-body">
+          <div class="modal-data" style="overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
             ${auditLogs.length === 0 ? '<p style="color: var(--text-muted); text-align:center;">Событий пока нет</p>' : ''}
             ${auditLogs.map(item => `
               <div class="log-item" style="border-left: 3px solid var(--accent);">
@@ -1332,7 +1340,6 @@
     return (text || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // Закрывать эмодзи-пикер при клике вне его
   document.addEventListener('click', () => {
     if (activeEmojiPicker !== null) {
       activeEmojiPicker = null;
