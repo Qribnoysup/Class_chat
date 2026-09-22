@@ -244,6 +244,7 @@
   let replyTarget = null; 
   let activeEmojiPicker = null; 
   let chatSearchQuery = '';
+  let currentChatQuery = null;
 
   let selectedProfileUser = null;
   let profileAdminData = null;
@@ -333,7 +334,6 @@
       database.ref('chats/dm').on('value', snap => {
         const allDms = snap.val() || {};
         const newUnread = {};
-        const mySafeKey = getSafeKey(currentUser);
 
         classmates.forEach(name => {
           if (name === currentUser) return;
@@ -401,6 +401,10 @@
 
   function logoutUser() {
     endProfileViewTracking();
+    if (currentChatQuery) {
+      currentChatQuery.off();
+      currentChatQuery = null;
+    }
     if (database && currentUser) {
       database.ref('presence/' + getSafeKey(currentUser)).set({ online: false, time: Date.now() });
       logAuditEvent("Вышел из системы");
@@ -549,6 +553,10 @@
 
   function switchTab(tab) {
     endProfileViewTracking();
+    if (currentChatQuery) {
+      currentChatQuery.off();
+      currentChatQuery = null;
+    }
     activeTab = tab;
     if (tab !== 'dm') dmTarget = null;
     prevMsgCount = -1;
@@ -839,7 +847,6 @@
               </div>
             </div>
 
-            <!-- Блок для обычного пользователя в своем аккаунте -->
             ${canEditBio && !isAdmin ? `
               <div class="bio-section">
                 <span class="bio-title">📝 О себе / Описание:</span>
@@ -858,7 +865,6 @@
               </div>
             ` : ''}
 
-            <!-- Досье Администратора (админ всегда видит пароль и управляет им) -->
             ${isAdmin ? `
               <div class="admin-dossier">
                 <div class="admin-dossier-title">
@@ -1052,7 +1058,8 @@
   function addReaction(path, msgId, emoji) {
     if (!database || !currentUser) return;
     const userSafeKey = getSafeKey(currentUser);
-    const ref = database.ref(`${path}/${msgId}/reactions/${emoji}/${userSafeKey}`);
+    const safeEmojiKey = encodeURIComponent(emoji).replace(/\./g, '%2E');
+    const ref = database.ref(`${path}/${msgId}/reactions/${safeEmojiKey}/${userSafeKey}`);
 
     ref.once('value').then(snap => {
       if (snap.exists()) {
@@ -1069,7 +1076,12 @@
     const chatBody = document.getElementById('chatBody');
     if (!path || !database || !chatBody) return;
 
-    database.ref(path).limitToLast(50).on('value', snap => {
+    if (currentChatQuery) {
+      currentChatQuery.off();
+    }
+
+    currentChatQuery = database.ref(path).limitToLast(50);
+    currentChatQuery.on('value', snap => {
       const data = snap.val() || {};
       let keys = Object.keys(data);
 
@@ -1120,14 +1132,16 @@
         if (msg.reactions) {
           const mySafeKey = getSafeKey(currentUser);
           let pills = [];
-          Object.keys(msg.reactions).forEach(emoji => {
-            const usersObj = msg.reactions[emoji] || {};
+          Object.keys(msg.reactions).forEach(emojiKey => {
+            let emoji = emojiKey;
+            try { emoji = decodeURIComponent(emojiKey); } catch(e){}
+            const usersObj = msg.reactions[emojiKey] || {};
             const count = Object.keys(usersObj).length;
             if (count > 0) {
               const hasMy = !!usersObj[mySafeKey];
               const safeEmoji = emoji.replace(/'/g, "\\'");
               pills.push(`
-                <div class="reaction-pill ${hasMy ? 'active' : ''}" onclick="addReaction('${path}', '${msgId}', '${safeEmoji}')">
+                <div class="reaction-pill ${hasMy ? 'active' : ''}" onclick="event.stopPropagation(); addReaction('${path}', '${msgId}', '${safeEmoji}')">
                   ${emoji} ${count}
                 </div>
               `);
@@ -1142,9 +1156,9 @@
         if (activeEmojiPicker === msgId) {
           const emojiBtns = ALLOWED_REACTIONS.map(emoji => {
             const safeEmoji = emoji.replace(/'/g, "\\'");
-            return `<button class="emoji-picker-btn" onclick="addReaction('${path}', '${msgId}', '${safeEmoji}')">${emoji}</button>`;
+            return `<button class="emoji-picker-btn" onclick="event.stopPropagation(); addReaction('${path}', '${msgId}', '${safeEmoji}')">${emoji}</button>`;
           }).join('');
-          emojiPickerHtml = `<div class="emoji-picker-popup">${emojiBtns}</div>`;
+          emojiPickerHtml = `<div class="emoji-picker-popup" onclick="event.stopPropagation()">${emojiBtns}</div>`;
         }
 
         msgEl.innerHTML = `
@@ -1248,21 +1262,49 @@
     const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
 
     database.ref('deleted_logs').push({
+      path: path,
       originalSender: sender,
       text: text,
       deletedBy: currentUser,
-      time: timeStr
+      time: timeStr,
+      timestamp: Date.now()
     });
 
     database.ref(path + '/' + msgId).remove();
     logAuditEvent(`Удалил сообщение от ${sender}`);
   }
 
+  function restoreMsg(logId) {
+    if (!database || !isAdmin) return;
+
+    database.ref('deleted_logs/' + logId).once('value').then(snap => {
+      const item = snap.val();
+      if (!item) return;
+
+      const targetPath = item.path || 'chats/global';
+
+      database.ref(targetPath).push({
+        sender: item.originalSender,
+        text: item.text,
+        time: item.time || '',
+        timestamp: item.timestamp || Date.now()
+      }).then(() => {
+        database.ref('deleted_logs/' + logId).remove();
+        logAuditEvent(`Восстановил удалённое сообщение от ${item.originalSender}`);
+        alert('Сообщение успешно восстановлено!');
+        openLogsModal();
+      });
+    });
+  }
+
   function openLogsModal() {
     if (!database || !isAdmin) return;
-    database.ref('deleted_logs').limitToLast(30).once('value').then(snap => {
+    database.ref('deleted_logs').limitToLast(50).once('value').then(snap => {
       const data = snap.val() || {};
-      deletedLogs = Object.values(data).reverse();
+      deletedLogs = Object.keys(data).map(key => ({
+        id: key,
+        ...data[key]
+      })).reverse();
       showLogsModal = true;
       renderApp();
     });
@@ -1284,11 +1326,18 @@
           <div class="modal-body">
             ${deletedLogs.length === 0 ? '<p style="color: var(--text-muted); text-align:center;">Удалённых сообщений нет</p>' : ''}
             ${deletedLogs.map(item => `
-              <div class="log-item">
-                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">
-                  Автор: <b>${item.originalSender}</b> | Удалил: <b style="color: #ef4444;">${item.deletedBy}</b> (${item.time})
+              <div class="log-item" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div style="flex:1;">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">
+                    Автор: <b>${escapeHtml(item.originalSender)}</b> | Удалил: <b style="color: #ef4444;">${escapeHtml(item.deletedBy)}</b> (${item.time || ''})
+                  </div>
+                  <div>${escapeHtml(item.text)}</div>
                 </div>
-                <div>${escapeHtml(item.text)}</div>
+                ${isAdmin ? `
+                  <button class="btn-pass" style="background:#22c55e; color:#fff; border:none; padding:6px 10px; flex-shrink:0; cursor:pointer;" onclick="restoreMsg('${item.id}')">
+                    ↩ Восстановить
+                  </button>
+                ` : ''}
               </div>
             `).join('')}
           </div>
