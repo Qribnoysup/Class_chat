@@ -519,7 +519,8 @@
         ` : ''}
         <div class="chat-input-bar">
           <input type="text" class="chat-input" id="msgInput" placeholder="Напишите сообщение..." oninput="handleTyping()" onkeydown="if(event.key==='Enter') sendMsg()">
-          <button class="btn-send" onmousedown="event.preventDefault()" ontouchstart="event.preventDefault()" onclick="sendMsg()">➤</button>
+          <!-- Исправленная кнопка -->
+          <button class="btn-send" onclick="sendMsg()">➤</button>
         </div>
       ` : ''}
 
@@ -1422,7 +1423,9 @@
     input.focus();
   }
 
+  /* Исправленная функция удаления сообщения */
   function deleteMsg(path, msgId, sender, text) {
+    if (!confirm("Вы уверены, что хотите удалить это сообщение?")) return;
     if (!database) return;
 
     const now = new Date();
