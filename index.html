@@ -101,18 +101,23 @@
       vertical-align: middle;
     }
 
-    /* Поиск в чате (Админ) */
+    /* Поиск и Закреплённое сообщение */
     .chat-search-bar { background: var(--header-bg); padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .pinned-msg-bar { background: rgba(56, 189, 248, 0.12); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; border-left: 4px solid var(--accent); flex-shrink: 0; }
+    .pinned-msg-text { color: var(--text-main); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 85%; }
 
-    /* Сообщения */
-    .chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; position: relative; }
+    /* Сообщения (Убран плавный скролл scroll-behavior: smooth, вызывавший дёргания) */
+    .chat-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: auto; position: relative; }
     .msg-card { display: flex; flex-direction: column; max-width: 85%; background: var(--card-bg); padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); position: relative; word-break: break-word; animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1); transition: transform 0.15s ease-out; touch-action: pan-y; }
     .msg-card.my-msg { align-self: flex-end; background: var(--my-msg-bg); color: #fff; border-color: var(--accent); }
     .msg-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.75rem; margin-bottom: 4px; }
     .msg-sender { font-weight: bold; color: var(--accent); cursor: pointer; }
     .my-msg .msg-sender { color: #f0f9ff; }
     .msg-anon-real { color: #ef4444; font-weight: bold; font-size: 0.7rem; }
-    .msg-text { font-size: 0.95rem; line-height: 1.3; cursor: pointer; }
+    .msg-text { font-size: 0.95rem; line-height: 1.35; cursor: pointer; }
+    .msg-text a { color: #38bdf8; text-decoration: underline; word-break: break-all; }
+    .my-msg .msg-text a { color: #e0f2fe; }
+    .msg-media-preview { max-width: 100%; border-radius: 10px; margin-top: 6px; border: 1px solid var(--border); max-height: 220px; object-fit: cover; }
     .msg-time { font-size: 0.65rem; color: var(--text-muted); align-self: flex-end; margin-top: 4px; }
     .my-msg .msg-time { color: rgba(255, 255, 255, 0.8); }
     .btn-action-msg { background: none; border: none; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; margin-left: 4px; }
@@ -146,7 +151,7 @@
     .btn-send { background: var(--accent); border: none; color: #0f172a; padding: 12px 18px; border-radius: 12px; font-weight: bold; cursor: pointer; }
     .btn-send:hover { transform: scale(1.05); }
 
-    /* Участники */
+    /* Участники и ЛС в стиле Telegram */
     .members-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; animation: fadeIn 0.25s ease; }
     .member-item { background: var(--card-bg); border: 1px solid var(--border); padding: 12px 14px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; transition: transform 0.2s, box-shadow 0.2s; }
     .member-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -161,6 +166,11 @@
     .btn-profile { background: rgba(56, 189, 248, 0.15); border: 1px solid var(--accent); color: var(--accent); padding: 6px 8px; border-radius: 10px; font-size: 0.8rem; cursor: pointer; font-weight: 600; }
     .btn-profile:hover { background: var(--accent); color: #0f172a; }
     .btn-dm { background: var(--header-bg); border: 1px solid var(--border); color: var(--accent); padding: 6px 8px; border-radius: 10px; font-size: 0.8rem; cursor: pointer; position: relative; }
+
+    /* Элемент диалога ЛС (стиль Telegram / WhatsApp) */
+    .dm-chat-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s, transform 0.15s; }
+    .dm-chat-item:hover { background: var(--border); transform: translateX(2px); }
+    .dm-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: #0f172a; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
     .dm-header { background: var(--card-bg); padding: 8px 16px; font-size: 0.85rem; color: var(--accent); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
     .btn-close-dm { background: none; border: none; color: var(--text-muted); font-size: 1rem; cursor: pointer; }
@@ -226,7 +236,7 @@
 
   let currentUser = localStorage.getItem('chat_user') || null;
   let isAdmin = localStorage.getItem('chat_is_admin') === 'true';
-  let activeTab = 'global'; 
+  let activeTab = 'global'; // 'global', 'anon', 'dms', 'class', 'top', 'dm'
   let currentTheme = localStorage.getItem('chat_theme') || 'dark'; 
   let dmTarget = null;
   let mutesObj = {};
@@ -234,9 +244,11 @@
   let presenceObj = {};
   let biosObj = {};
   let typingObj = {};
+  let pinnedObj = {};
   let dmUnreadMap = {}; 
   let showLogsModal = false;
   let showAuditLogsModal = false;
+  let showSearchInput = false;
   let deletedLogs = [];
   let auditLogs = [];
   let prevMsgCount = -1;
@@ -263,6 +275,29 @@
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return mins + ' мин. ' + (secs > 0 ? secs + ' сек.' : '');
+  }
+
+  function escapeHtml(text) {
+    return (text || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function formatTextWithMedia(text) {
+    if (!text) return '';
+    const safe = escapeHtml(text);
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+    return safe.replace(urlRegex, function(url) {
+      const cleanUrl = url.trim();
+      const lower = cleanUrl.toLowerCase();
+      if (lower.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/)) {
+        return `<br><a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a><br><img src="${cleanUrl}" class="msg-media-preview" alt="Изображение" loading="lazy">`;
+      } else if (lower.match(/\.(mp4|webm|ogg)($|\?)/)) {
+        return `<br><a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a><br><video src="${cleanUrl}" class="msg-media-preview" controls></video>`;
+      } else if (lower.match(/\.(mp3|wav|ogg)($|\?)/)) {
+        return `<br><a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a><br><audio src="${cleanUrl}" controls style="margin-top:6px; max-width:100%;"></audio>`;
+      }
+      return `<a href="${cleanUrl}" target="_blank" rel="noopener">${cleanUrl}</a>`;
+    });
   }
 
   function logAuditEvent(eventStr) {
@@ -328,6 +363,7 @@
     database.ref('likes').on('value', snap => { likesObj = snap.val() || {}; renderApp(); });
     database.ref('presence').on('value', snap => { presenceObj = snap.val() || {}; renderApp(); });
     database.ref('bios').on('value', snap => { biosObj = snap.val() || {}; renderApp(); });
+    database.ref('pinned_msgs').on('value', snap => { pinnedObj = snap.val() || {}; renderApp(); });
     database.ref('typing').on('value', snap => { typingObj = snap.val() || {}; updateTypingUI(); });
 
     if (currentUser) {
@@ -414,12 +450,20 @@
     renderApp();
   }
 
+  function toggleSearchBar() {
+    showSearchInput = !showSearchInput;
+    if (!showSearchInput) chatSearchQuery = '';
+    renderApp();
+  }
+
   function renderApp() {
     const app = document.getElementById('app');
     if (!currentUser) { renderAuth(app); return; }
 
     const safeMyName = currentUser.replace(/'/g, "\\'");
     const hasAnyUnreadDm = Object.values(dmUnreadMap).some(val => val);
+    const activePathKey = getSafeKey(getChatRefPath());
+    const pinnedMsg = pinnedObj[activePathKey];
 
     app.innerHTML = `
       <div class="header">
@@ -428,6 +472,8 @@
           ${isAdmin ? '<span class="admin-indicator">АДМИН</span>' : ''}
         </div>
         <div class="header-btns">
+          <button class="btn-icon" onclick="switchTab('class')" title="Список Класса">👥</button>
+          <button class="btn-icon" onclick="toggleSearchBar()" title="Поиск">🔍</button>
           <button class="btn-icon" onclick="toggleTheme()" title="Сменить тему">🎨</button>
           ${isAdmin ? `<button class="btn-icon" onclick="openAuditLogsModal()" title="Журнал событий">📜</button>` : ''}
           ${isAdmin ? `<button class="btn-icon" onclick="openLogsModal()" title="Журнал удалённых">🗑️</button>` : ''}
@@ -439,26 +485,37 @@
       <div class="tabs">
         <button class="tab-btn ${activeTab === 'global' ? 'active' : ''}" onclick="switchTab('global')">🌐 Общий</button>
         <button class="tab-btn ${activeTab === 'anon' ? 'active' : ''}" onclick="switchTab('anon')">🎭 Аноним</button>
-        <button class="tab-btn ${activeTab === 'members' || activeTab === 'dm' ? 'active' : ''}" onclick="switchTab('members')">
-          👥 Класс & ЛС ${hasAnyUnreadDm ? '<span class="unread-dot"></span>' : ''}
+        <button class="tab-btn ${(activeTab === 'dms' || activeTab === 'dm') ? 'active' : ''}" onclick="switchTab('dms')">
+          💬 ЛС ${hasAnyUnreadDm ? '<span class="unread-dot"></span>' : ''}
         </button>
         <button class="tab-btn ${activeTab === 'top' ? 'active' : ''}" onclick="switchTab('top')">🏆 Топ</button>
       </div>
 
-      ${(isAdmin && activeTab !== 'members' && activeTab !== 'top') ? `
+      ${(showSearchInput && activeTab !== 'class' && activeTab !== 'dms' && activeTab !== 'top') ? `
         <div class="chat-search-bar">
-          <input type="text" class="search-input" id="chatSearch" placeholder="🔍 (Админ) Поиск по сообщениям..." value="${escapeHtml(chatSearchQuery)}" oninput="onSearchInput(this.value)">
+          <input type="text" class="search-input" id="chatSearch" placeholder="🔍 Поиск по сообщениям..." value="${escapeHtml(chatSearchQuery)}" oninput="onSearchInput(this.value)">
         </div>
       ` : ''}
 
-      ${activeTab === 'members' ? renderMembersHTML() : ''}
+      ${(pinnedMsg && activeTab !== 'class' && activeTab !== 'dms' && activeTab !== 'top') ? `
+        <div class="pinned-msg-bar">
+          <div>
+            <span>📌 <b>Закреплено (${escapeHtml(pinnedMsg.sender)}):</b></span>
+            <div class="pinned-msg-text">${escapeHtml(pinnedMsg.text)}</div>
+          </div>
+          ${isAdmin ? `<button class="btn-close-dm" onclick="unpinMsg()" title="Открепить">✖</button>` : ''}
+        </div>
+      ` : ''}
+
+      ${activeTab === 'dms' ? renderDmsListHTML() : ''}
+      ${activeTab === 'class' ? renderClassListHTML() : ''}
       ${activeTab === 'top' ? renderTopHTML() : ''}
       ${activeTab === 'dm' ? renderDmHeaderHTML() : ''}
-      ${(activeTab !== 'members' && activeTab !== 'top') ? '<div class="chat-body" id="chatBody">Загрузка...</div>' : ''}
+      ${(activeTab !== 'class' && activeTab !== 'dms' && activeTab !== 'top') ? '<div class="chat-body" id="chatBody">Загрузка...</div>' : ''}
 
       <div id="typingContainer"></div>
 
-      ${(activeTab !== 'members' && activeTab !== 'top') ? `
+      ${(activeTab !== 'class' && activeTab !== 'dms' && activeTab !== 'top') ? `
         ${replyTarget ? `
           <div class="reply-preview-bar">
             <div>
@@ -479,7 +536,7 @@
       ${selectedProfileUser ? renderProfileModalHTML() : ''}
     `;
 
-    if (activeTab !== 'members' && activeTab !== 'top') {
+    if (activeTab !== 'class' && activeTab !== 'dms' && activeTab !== 'top') {
       listenChatMessages();
       updateTypingUI();
     }
@@ -546,7 +603,13 @@
           logAuditEvent(`Неверный пароль для аккаунта: ${name}`);
         }
       } else {
-        alert(`Пароль/код для аккаунта "${name}" ещё не установлен. Попросите админа задать код.`);
+        const newPass = prompt(`Пароль для "${name}" ещё не установлен. Создайте новый код/пароль:`);
+        if (newPass && newPass.trim() !== '') {
+          database.ref('passwords/' + safeKey).set(newPass.trim()).then(() => {
+            alert("Пароль успешно создан! Теперь войдите с новым паролем.");
+            selectUser(name);
+          });
+        }
       }
     });
   }
@@ -588,7 +651,7 @@
 
   function updateTypingUI() {
     const container = document.getElementById('typingContainer');
-    if (!container || activeTab === 'members' || activeTab === 'top') return;
+    if (!container || activeTab === 'class' || activeTab === 'dms' || activeTab === 'top') return;
 
     const pathKey = getSafeKey(getChatRefPath());
     const currentTyping = typingObj[pathKey] || {};
@@ -606,18 +669,76 @@
     }
   }
 
-  function renderMembersHTML() {
+  /* Экран ЛС (в стиле WhatsApp / Telegram) */
+  function renderDmsListHTML() {
     return `
       <div class="members-list">
-        <input type="text" class="search-input" id="memberSearch" placeholder="🔍 Поиск одноклассника..." oninput="filterMembersList()" style="margin: 0 0 10px 0;">
-        <div id="membersContainer" style="display: flex; flex-direction: column; gap: 10px;">
-          ${renderMembersCards('')}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+          <h3 style="color:var(--accent);">💬 Личные сообщения</h3>
+          <button class="btn-icon" onclick="switchTab('class')" style="display:flex; align-items:center; gap:4px; padding:6px 12px;" title="Список класса">
+            👥 Посмотреть класс
+          </button>
+        </div>
+        <input type="text" class="search-input" id="dmSearch" placeholder="🔍 Найти диалог..." oninput="filterDmsList()" style="margin: 0 0 10px 0;">
+        <div id="dmsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+          ${renderDmsCards('')}
         </div>
       </div>
     `;
   }
 
-  function renderMembersCards(filterVal) {
+  function renderDmsCards(filterVal) {
+    const searchVal = filterVal.toLowerCase().trim();
+
+    return classmates.filter(name => name !== currentUser && name.toLowerCase().includes(searchVal)).map(name => {
+      const targetSafeKey = getSafeKey(name);
+      const isOnline = presenceObj[targetSafeKey]?.online || false;
+      const hasUnread = !!dmUnreadMap[name];
+      const safeName = name.replace(/'/g, "\\'");
+
+      return `
+        <div class="dm-chat-item" onclick="openDm('${safeName}')">
+          <div class="dm-avatar">${name.charAt(0)}</div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; font-size:0.95rem; color:var(--text-main);">${name}</span>
+              ${hasUnread ? '<span class="unread-dot"></span>' : ''}
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
+              <span class="${isOnline ? 'online-dot' : 'offline-dot'}"></span>
+              ${isOnline ? 'В сети' : 'Офлайн'}
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function filterDmsList() {
+    const val = document.getElementById('dmSearch')?.value || '';
+    const container = document.getElementById('dmsContainer');
+    if (container) {
+      container.innerHTML = renderDmsCards(val);
+    }
+  }
+
+  /* Экран Списка Класса */
+  function renderClassListHTML() {
+    return `
+      <div class="members-list">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+          <h3 style="color:var(--accent);">👥 Одноклассники</h3>
+          <button class="btn-icon" onclick="switchTab('dms')" style="padding:6px 12px;">💬 К сообщениям</button>
+        </div>
+        <input type="text" class="search-input" id="memberSearch" placeholder="🔍 Поиск одноклассника..." oninput="filterClassList()" style="margin: 0 0 10px 0;">
+        <div id="classContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          ${renderClassCards('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClassCards(filterVal) {
     const mySafeKey = getSafeKey(currentUser);
     const searchVal = filterVal.toLowerCase().trim();
 
@@ -654,11 +775,11 @@
     }).join('');
   }
 
-  function filterMembersList() {
+  function filterClassList() {
     const val = document.getElementById('memberSearch')?.value || '';
-    const container = document.getElementById('membersContainer');
+    const container = document.getElementById('classContainer');
     if (container) {
-      container.innerHTML = renderMembersCards(val);
+      container.innerHTML = renderClassCards(val);
     }
   }
 
@@ -920,7 +1041,7 @@
                       ${profileAdminData.dms.length === 0 ? '<span style="color:var(--text-muted);">Нет переписок в ЛС</span>' : ''}
                       ${profileAdminData.dms.map(m => `
                         <div class="dossier-item dm-item">
-                          <b>${m.sender}:</b> ${escapeHtml(m.text)} <span style="font-size:0.65rem; color:var(--text-muted);">(${m.time || ''})</span>
+                          <b>${m.sender}:</b>${escapeHtml(m.text)} <span style="font-size:0.65rem; color:var(--text-muted);">(${m.time || ''})</span>
                         </div>
                       `).join('')}
                     </div>
@@ -972,7 +1093,7 @@
     return `
       <div class="dm-header">
         <span onclick="openProfile('${safeName}')" style="cursor:pointer;">💬 Диалог с: <b>${dmTarget}</b> (Профиль)</span>
-        <button class="btn-close-dm" onclick="switchTab('members')">✖ Назад</button>
+        <button class="btn-close-dm" onclick="switchTab('dms')">✖ Назад</button>
       </div>
     `;
   }
@@ -1038,6 +1159,26 @@
     return null;
   }
 
+  function pinMsg(path, msgId, text, sender) {
+    if (!database || !isAdmin) return;
+    const pathKey = getSafeKey(path);
+    database.ref('pinned_msgs/' + pathKey).set({
+      id: msgId,
+      text: text,
+      sender: sender
+    }).then(() => {
+      logAuditEvent(`Закрепил сообщение в ${path}`);
+    });
+  }
+
+  function unpinMsg() {
+    if (!database || !isAdmin) return;
+    const pathKey = getSafeKey(getChatRefPath());
+    database.ref('pinned_msgs/' + pathKey).remove().then(() => {
+      logAuditEvent(`Открепил сообщение`);
+    });
+  }
+
   function setReply(msgId, sender, text) {
     replyTarget = { id: msgId, sender: sender, text: text };
     renderApp();
@@ -1052,7 +1193,7 @@
   function toggleEmojiPicker(msgId, event) {
     if (event) event.stopPropagation();
     activeEmojiPicker = activeEmojiPicker === msgId ? null : msgId;
-    listenChatMessages();
+    renderChatMessagesOnly();
   }
 
   function addReaction(path, msgId, emoji) {
@@ -1071,6 +1212,111 @@
     });
   }
 
+  let cachedChatSnapshot = null;
+
+  function renderChatMessagesOnly() {
+    const chatBody = document.getElementById('chatBody');
+    if (!chatBody || !cachedChatSnapshot) return;
+
+    const data = cachedChatSnapshot;
+    let keys = Object.keys(data);
+    const path = getChatRefPath();
+
+    chatBody.innerHTML = '';
+
+    if (chatSearchQuery.trim() !== '') {
+      const query = chatSearchQuery.toLowerCase();
+      keys = keys.filter(id => {
+        const m = data[id];
+        return (m.text || '').toLowerCase().includes(query) || (m.sender || '').toLowerCase().includes(query);
+      });
+    }
+
+    keys.forEach(msgId => {
+      const msg = data[msgId];
+      const isMy = msg.sender === currentUser;
+      const isAnonTab = activeTab === 'anon';
+      
+      let displayName = isAnonTab ? '🎭 Аноним' : msg.sender;
+      let adminRealNameInfo = (isAnonTab && isAdmin) ? `<span class="msg-anon-real">(${msg.sender})</span>` : '';
+
+      const msgEl = document.createElement('div');
+      msgEl.className = `msg-card ${isMy ? 'my-msg' : ''}`;
+      msgEl.id = `msg-${msgId}`;
+      
+      const safeText = (msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const safeSender = (msg.sender || '').replace(/'/g, "\\'");
+
+      let replyHtml = '';
+      if (msg.replyTo) {
+        replyHtml = `
+          <div class="msg-reply-quote">
+            <span class="msg-reply-author">${escapeHtml(msg.replyTo.sender)}</span>
+            ${escapeHtml(msg.replyTo.text)}
+          </div>
+        `;
+      }
+
+      let reactionsHtml = '';
+      if (msg.reactions) {
+        const mySafeKey = getSafeKey(currentUser);
+        let pills = [];
+        Object.keys(msg.reactions).forEach(emojiKey => {
+          let emoji = emojiKey;
+          try { emoji = decodeURIComponent(emojiKey); } catch(e){}
+          const usersObj = msg.reactions[emojiKey] || {};
+          const count = Object.keys(usersObj).length;
+          if (count > 0) {
+            const hasMy = !!usersObj[mySafeKey];
+            const safeEmoji = emoji.replace(/'/g, "\\'");
+            pills.push(`
+              <div class="reaction-pill ${hasMy ? 'active' : ''}" onclick="event.stopPropagation(); addReaction('${path}', '${msgId}', '${safeEmoji}')">
+                ${emoji} ${count}
+              </div>
+            `);
+          }
+        });
+        if (pills.length > 0) {
+          reactionsHtml = `<div class="reactions-bar">${pills.join('')}</div>`;
+        }
+      }
+
+      let emojiPickerHtml = '';
+      if (activeEmojiPicker === msgId) {
+        const emojiBtns = ALLOWED_REACTIONS.map(emoji => {
+          const safeEmoji = emoji.replace(/'/g, "\\'");
+          return `<button class="emoji-picker-btn" onclick="event.stopPropagation(); addReaction('${path}', '${msgId}', '${safeEmoji}')">${emoji}</button>`;
+        }).join('');
+        emojiPickerHtml = `<div class="emoji-picker-popup" onclick="event.stopPropagation()">${emojiBtns}</div>`;
+      }
+
+      msgEl.innerHTML = `
+        ${replyHtml}
+        <div class="msg-header">
+          <span class="msg-sender" onclick="${!isAnonTab || isAdmin ? `openProfile('${safeSender}')` : ''}">${displayName} ${adminRealNameInfo}</span>
+          <div>
+            ${isAdmin ? `<button class="btn-action-msg" onclick="pinMsg('${path}', '${msgId}', '${safeText}', '${safeSender}')" title="Закрепить">📌</button>` : ''}
+            <button class="btn-action-msg" onclick="toggleEmojiPicker('${msgId}', event)" title="Добавить реакцию">😃</button>
+            ${(isAdmin || isMy) ? `<button class="btn-action-msg" style="color:#ef4444;" onclick="deleteMsg('${path}', '${msgId}', '${safeSender}', '${safeText}')">🗑️</button>` : ''}
+          </div>
+        </div>
+        <div class="msg-text" onclick="toggleEmojiPicker('${msgId}', event)">${formatTextWithMedia(msg.text)}</div>
+        ${reactionsHtml}
+        ${emojiPickerHtml}
+        <div class="msg-time">${msg.time || ''}</div>
+      `;
+
+      attachSwipeToReply(msgEl, msgId, safeSender, safeText);
+
+      chatBody.appendChild(msgEl);
+    });
+
+    // Фиксация скролла внизу без скачков
+    requestAnimationFrame(() => {
+      chatBody.scrollTop = chatBody.scrollHeight;
+    });
+  }
+
   function listenChatMessages() {
     const path = getChatRefPath();
     const chatBody = document.getElementById('chatBody');
@@ -1080,9 +1326,10 @@
       currentChatQuery.off();
     }
 
-    currentChatQuery = database.ref(path).limitToLast(50);
+    currentChatQuery = database.ref(path).limitToLast(60);
     currentChatQuery.on('value', snap => {
       const data = snap.val() || {};
+      cachedChatSnapshot = data;
       let keys = Object.keys(data);
 
       if (prevMsgCount !== -1 && keys.length > prevMsgCount) {
@@ -1093,94 +1340,7 @@
       }
       prevMsgCount = keys.length;
 
-      chatBody.innerHTML = '';
-
-      if (isAdmin && chatSearchQuery.trim() !== '') {
-        const query = chatSearchQuery.toLowerCase();
-        keys = keys.filter(id => {
-          const m = data[id];
-          return (m.text || '').toLowerCase().includes(query) || (m.sender || '').toLowerCase().includes(query);
-        });
-      }
-
-      keys.forEach(msgId => {
-        const msg = data[msgId];
-        const isMy = msg.sender === currentUser;
-        const isAnonTab = activeTab === 'anon';
-        
-        let displayName = isAnonTab ? '🎭 Аноним' : msg.sender;
-        let adminRealNameInfo = (isAnonTab && isAdmin) ? `<span class="msg-anon-real">(${msg.sender})</span>` : '';
-
-        const msgEl = document.createElement('div');
-        msgEl.className = `msg-card ${isMy ? 'my-msg' : ''}`;
-        msgEl.id = `msg-${msgId}`;
-        
-        const safeText = (msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const safeSender = (msg.sender || '').replace(/'/g, "\\'");
-
-        let replyHtml = '';
-        if (msg.replyTo) {
-          replyHtml = `
-            <div class="msg-reply-quote">
-              <span class="msg-reply-author">${escapeHtml(msg.replyTo.sender)}</span>
-              ${escapeHtml(msg.replyTo.text)}
-            </div>
-          `;
-        }
-
-        let reactionsHtml = '';
-        if (msg.reactions) {
-          const mySafeKey = getSafeKey(currentUser);
-          let pills = [];
-          Object.keys(msg.reactions).forEach(emojiKey => {
-            let emoji = emojiKey;
-            try { emoji = decodeURIComponent(emojiKey); } catch(e){}
-            const usersObj = msg.reactions[emojiKey] || {};
-            const count = Object.keys(usersObj).length;
-            if (count > 0) {
-              const hasMy = !!usersObj[mySafeKey];
-              const safeEmoji = emoji.replace(/'/g, "\\'");
-              pills.push(`
-                <div class="reaction-pill ${hasMy ? 'active' : ''}" onclick="event.stopPropagation(); addReaction('${path}', '${msgId}', '${safeEmoji}')">
-                  ${emoji} ${count}
-                </div>
-              `);
-            }
-          });
-          if (pills.length > 0) {
-            reactionsHtml = `<div class="reactions-bar">${pills.join('')}</div>`;
-          }
-        }
-
-        let emojiPickerHtml = '';
-        if (activeEmojiPicker === msgId) {
-          const emojiBtns = ALLOWED_REACTIONS.map(emoji => {
-            const safeEmoji = emoji.replace(/'/g, "\\'");
-            return `<button class="emoji-picker-btn" onclick="event.stopPropagation(); addReaction('${path}', '${msgId}', '${safeEmoji}')">${emoji}</button>`;
-          }).join('');
-          emojiPickerHtml = `<div class="emoji-picker-popup" onclick="event.stopPropagation()">${emojiBtns}</div>`;
-        }
-
-        msgEl.innerHTML = `
-          ${replyHtml}
-          <div class="msg-header">
-            <span class="msg-sender" onclick="${!isAnonTab || isAdmin ? `openProfile('${safeSender}')` : ''}">${displayName} ${adminRealNameInfo}</span>
-            <div>
-              <button class="btn-action-msg" onclick="toggleEmojiPicker('${msgId}', event)" title="Добавить реакцию">😃</button>
-              ${(isAdmin || isMy) ? `<button class="btn-action-msg" style="color:#ef4444;" onclick="deleteMsg('${path}', '${msgId}', '${safeSender}', '${safeText}')">🗑️</button>` : ''}
-            </div>
-          </div>
-          <div class="msg-text" onclick="toggleEmojiPicker('${msgId}', event)">${escapeHtml(msg.text)}</div>
-          ${reactionsHtml}
-          ${emojiPickerHtml}
-          <div class="msg-time">${msg.time || ''}</div>
-        `;
-
-        attachSwipeToReply(msgEl, msgId, safeSender, safeText);
-
-        chatBody.appendChild(msgEl);
-      });
-      chatBody.scrollTop = chatBody.scrollHeight;
+      renderChatMessagesOnly();
     });
   }
 
@@ -1213,6 +1373,7 @@
     });
   }
 
+  /* Исправленная отправка без полной перерисовки приложения (без дёргания) */
   function sendMsg() {
     const input = document.getElementById('msgInput');
     const text = input ? input.value.trim() : '';
@@ -1252,7 +1413,10 @@
 
     input.value = '';
     replyTarget = null;
-    renderApp();
+    
+    // Скрываем панель цитаты без полной перезагрузки
+    const replyBar = document.querySelector('.reply-preview-bar');
+    if (replyBar) replyBar.remove();
   }
 
   function deleteMsg(path, msgId, sender, text) {
@@ -1369,7 +1533,7 @@
             <span>📜 Журнал событий (Audit Logs)</span>
             <button class="btn-close-dm" onclick="closeAuditLogsModal()">✖</button>
           </div>
-          <div class="modal-data" style="overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+          <div class="modal-body">
             ${auditLogs.length === 0 ? '<p style="color: var(--text-muted); text-align:center;">Событий пока нет</p>' : ''}
             ${auditLogs.map(item => `
               <div class="log-item" style="border-left: 3px solid var(--accent);">
@@ -1385,14 +1549,10 @@
     `;
   }
 
-  function escapeHtml(text) {
-    return (text || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
   document.addEventListener('click', () => {
     if (activeEmojiPicker !== null) {
       activeEmojiPicker = null;
-      listenChatMessages();
+      renderChatMessagesOnly();
     }
   });
 
